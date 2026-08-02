@@ -224,6 +224,11 @@ is mocked — each test asserts the malicious fixture is actually stopped:
 lazy.nvim is fetched into a cache dir on first run; point `AEGIS_TEST_LAZY` at
 an existing checkout to skip that.
 
+CI runs stylua and luacheck on every push. The e2e suite needs the `aegis`
+binary, which currently lives in a private repo — public runners cannot fetch
+it, so that job emits a "skipped" warning rather than failing. **Run
+`tests/run.sh` locally before trusting a green CI badge on this repo.**
+
 ## License
 
 MIT
