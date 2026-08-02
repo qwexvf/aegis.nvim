@@ -1,0 +1,140 @@
+*aegis.txt*  Supply-chain gate for lazy.nvim
+
+==============================================================================
+CONTENTS                                                       *aegis-contents*
+
+  1. Introduction ......................... |aegis-introduction|
+  2. Setup ................................ |aegis-setup|
+  3. Configuration ........................ |aegis-config|
+  4. Commands ............................. |aegis-commands|
+  5. Approvals ............................ |aegis-approvals|
+  6. Limits ............................... |aegis-limits|
+
+==============================================================================
+1. INTRODUCTION                                            *aegis-introduction*
+
+aegis.nvim gates every point at which a lazy.nvim plugin repository can get
+its own code executed, on an aegis-cli verdict for that exact commit.
+
+  clone   a new plugin is scanned before its pipeline continues
+  update  the incoming commit is scanned before it reaches the worktree
+  build   build hooks never run for an unapproved tree
+  load    an unapproved tree never reaches 'runtimepath'
+
+Three further paths are removed rather than gated, because they execute
+repo-authored code before any scan could see it:
+
+  pkg     lazy reads the repo's own lazy.lua / rockspec / packspec
+  rocks   luarocks build scripts
+  submodules  fetched during clone, an RCE surface on older git
+
+Requires the `aegis` binary on $PATH.
+
+==============================================================================
+2. SETUP                                                          *aegis-setup*
+
+require("aegis").setup() must run before require("lazy").setup(), and lazy's
+options must be passed through |aegis.lazy_opts()|: >lua
+
+    require("aegis").setup({})
+
+    require("lazy").setup(spec, require("aegis").lazy_opts({
+      -- your usual lazy options
+    }))
+<
+Without lazy_opts() the hardening and the load gate are absent. Run
+`:checkhealth aegis` to confirm what is live.
+
+aegis.nvim must be on 'runtimepath' before lazy.setup() runs, so bootstrap it
+alongside lazy rather than as a managed plugin. See the README.
+
+                                                            *aegis.lazy_opts()*
+aegis.lazy_opts({opts})
+    Returns {opts} with the gate and hardening settings merged in. An existing
+    `defaults.cond` of yours is composed with, not replaced.
+
+==============================================================================
+3. CONFIGURATION                                                 *aegis-config*
+
+Defaults: >lua
+
+    {
+      bin = "aegis",
+      fail_on = "prompt",
+      gates = { clone = true, update = true, build = true, load = true },
+      strict_clone = false,
+      harden = {
+        pkg = true, rocks = true, submodules = true,
+        require_https = true, allowed_hosts = {},
+      },
+      on_missing_scanner = "warn",
+      on_scan_error = "block",
+      load_unknown = "allow",
+      evidence = true,
+      timeout = 120000,
+      notify = true,
+      state_dir = nil,
+    }
+<
+fail_on ~
+    Weakest verdict that blocks: "safe", "review", "prompt" or "block".
+    Defaults to "prompt". aegis scores a Lua tree by capability, and for a
+    Lua-only plugin the block tier (>=100) is realistically only reached by a
+    malicious build hook. Credential reads, shell spawns, dynamic eval and a
+    hardcoded IP together score 75 — "prompt". Gating on "block" would let
+    those through.
+
+strict_clone ~
+    Clone into a throwaway directory and scan there, so a rejected tree never
+    occupies plugin.dir. Costs one extra shallow fetch per new plugin.
+
+load_unknown ~
+    What the load gate does with a plugin it has no cached verdict for.
+    "allow" (default) lets it load once, scans it in the background, and
+    enforces from the next startup. Set to "block" once `:Aegis scan` has
+    warmed the cache.
+
+on_missing_scanner ~
+    "warn" (default) leaves plugins ungated when the aegis binary is absent.
+    "block" refuses everything instead.
+
+harden.allowed_hosts ~
+    When non-empty, only these git hosts may be cloned from.
+
+==============================================================================
+4. COMMANDS                                                    *aegis-commands*
+
+                                                                      *:Aegis*
+:Aegis [status]         Verdict, risk and capabilities per plugin.
+:Aegis scan             Scan every plugin. :Aegis! scan ignores the cache.
+:Aegis scan {plugin}    Scan one plugin.
+:Aegis report {plugin}  Risk flags and file:line evidence.
+:Aegis approve {plugin} Approve the installed commit.
+:Aegis revoke {plugin}  Drop an approval.
+:Aegis clear            Clear the verdict cache. Approvals are kept.
+
+==============================================================================
+5. APPROVALS                                                  *aegis-approvals*
+
+An approval is pinned to a commit sha, stored in
+`stdpath("state")/aegis-nvim/approvals.json`.
+
+The next update moves the sha, the approval stops applying, and the incoming
+tree is gated again. There is no way to approve a plugin in general — only a
+specific tree you have looked at.
+
+Legitimate plugins that manage external binaries (LSP installers, formatters)
+will need approving on adoption. That is working as intended: they really do
+spawn shells and write outside their root.
+
+==============================================================================
+6. LIMITS                                                        *aegis-limits*
+
+- Static capability analysis is not proof of safety. Novel obfuscation and
+  malice expressed in ordinary API calls pass.
+- `aegis` parses hostile input on your machine. Sandbox it if that matters.
+- Your own init.lua and spec `config`/`init` functions are never scanned.
+- Plugins installed before adoption are ungated until the cache is warm.
+- Only lazy.nvim is supported. For vim.pack, see pakku.nvim.
+
+vim:tw=78:ts=8:noet:ft=help:norl:

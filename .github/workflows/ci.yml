@@ -1,0 +1,52 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  format:
+    name: stylua
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: JohnnyMorganz/stylua-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          version: latest
+          args: --check lua/ tests/
+
+  lint:
+    name: luacheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leafo/gh-actions-lua@v10
+        with:
+          luaVersion: 5.1
+      - uses: leafo/gh-actions-luarocks@v4
+      - name: install luacheck
+        run: luarocks install luacheck
+      - name: run
+        run: luacheck lua/ tests/ plugin/
+
+  test:
+    name: nvim ${{ matrix.nvim }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        nvim: [stable, nightly]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: ${{ matrix.nvim }}
+      - name: install aegis-cli
+        run: |
+          go install github.com/qwexvf/aegis-cli/cmd/aegis@latest
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+      - name: e2e
+        run: tests/run.sh
