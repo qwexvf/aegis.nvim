@@ -34,6 +34,32 @@ function M.available() return M.version() ~= nil end
 
 function M.forget_version() version_cache = nil end
 
+--- Record a scan that produced no usable report, under state_dir/failures/.
+--- Kept deliberately: an unparseable scan blocks a plugin, and without the raw
+--- output there is no way to tell a broken scanner from a hostile tree.
+function M.dump_failure(dir, cmd, res)
+  local ok, err = pcall(function()
+    local path = vim.fs.joinpath(Config.get().state_dir, "failures", vim.fs.basename(dir) .. ".txt")
+    vim.fn.mkdir(vim.fs.dirname(path), "p")
+    local fd = io.open(path, "w")
+    if not fd then return end
+    fd:write(
+      ("cmd: %s\nexit: %s\ndir exists: %s\nlua files: %d\nstdout+stderr (%d bytes):\n%s\n"):format(
+        table.concat(cmd, " "),
+        tostring(res.code),
+        tostring(vim.fn.isdirectory(dir) == 1),
+        #vim.fn.glob(dir .. "/**/*.lua", false, true),
+        #(res.stdout or ""),
+        res.stdout or ""
+      )
+    )
+    fd:close()
+  end)
+  if not ok then
+    vim.schedule(function() vim.notify("aegis: " .. tostring(err), vim.log.levels.DEBUG) end)
+  end
+end
+
 --- Scan a directory that is already on disk. Does not consult the cache;
 --- callers decide whether a cached verdict is acceptable.
 ---@param dir string
@@ -46,14 +72,26 @@ function M.scan_dir(dir)
   local cmd = { cfg.bin, "analyze", "--ecosystem", "neovim", dir, "--json" }
   if cfg.evidence then table.insert(cmd, "--evidence") end
 
-  local res = Proc.exec(cmd, { timeout = cfg.timeout })
-  local report = Proc.decode_json(res.stdout)
+  -- Retry once on an empty/unparseable result. A cold install runs the scanner
+  -- against every plugin at lazy's full concurrency, and under that load it
+  -- occasionally returns nothing at all. Failing closed is correct for a
+  -- hostile tree and wrong for a flaky scanner — one retry separates them
+  -- without weakening the verdict.
+  local res, report
+  for _ = 1, 2 do
+    res = Proc.exec(cmd, { timeout = cfg.timeout })
+    report = Proc.decode_json(res.stdout)
+    if report then break end
+  end
 
   -- aegis exits non-zero for findings on some subcommands, so a bad exit code
   -- with a parseable report is still a usable verdict. Only an unparseable
   -- result is a scan failure.
   if not report then
     local detail = vim.trim(res.stderr ~= "" and res.stderr or res.stdout)
+    -- A failed scan means a blocked plugin, so the raw output is the only way
+    -- to tell a broken scanner from a genuinely unscannable tree. Keep it.
+    M.dump_failure(dir, cmd, res)
     return nil,
       ("aegis analyze failed (exit %d)%s"):format(res.code, detail ~= "" and ": " .. detail or "")
   end
