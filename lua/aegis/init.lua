@@ -140,8 +140,8 @@ function M.approve(name, opts)
     -- gate recorded as blocked this session.
     sha = Gate.target_sha(plugin) or (Gate.blocked[name] and Gate.blocked[name].sha)
     if not sha then
-      return false, ("no pending update target for %s — run `:Lazy update %s` first")
-        :format(name, name)
+      return false,
+        ("no pending update target for %s — run `:Lazy update %s` first"):format(name, name)
     end
     if sha == Git.head_sha(plugin.dir) then
       return false, ("%s is already at %s; nothing to approve"):format(name, Git.short(sha))

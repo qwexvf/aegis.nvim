@@ -32,10 +32,7 @@ H.ok(
 -- The bang is the explicit yes to the target the update wants.
 local ok, msg = require("aegis").approve("victim", { target = true })
 H.ok(ok, "approve! succeeds: " .. tostring(msg))
-H.ok(
-  require("aegis.cache").approved("victim", incoming),
-  "approve! pins the incoming commit"
-)
+H.ok(require("aegis.cache").approved("victim", incoming), "approve! pins the incoming commit")
 
 -- ...and now the update actually lands.
 lazy.update({ wait = true, show = false })
