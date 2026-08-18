@@ -155,8 +155,9 @@ end
 -- checkout / update -----------------------------------------------------------
 
 -- What commit is this checkout about to move to? Reuses lazy's own resolution
--- so we scan the same tree lazy is about to write.
-local function target_sha(plugin, opts)
+-- so we scan the same tree lazy is about to write. Exported so `:Aegis approve!`
+-- can resolve the same target the update gate is about to block.
+function M.target_sha(plugin, opts)
   local LazyGit = require("lazy.manage.git")
   local Lock = require("lazy.manage.lock")
 
@@ -183,7 +184,7 @@ function M.wrap_checkout()
     if plugin._.cloned then return orig(task, opts) end
 
     local from = Git.head_sha(plugin.dir)
-    local to = target_sha(plugin, opts)
+    local to = M.target_sha(plugin, opts)
 
     -- Nothing moving, or we could not tell: fall through and verify after.
     if to and from and to ~= from then

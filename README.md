@@ -178,12 +178,19 @@ has executed at that point (checkout, helptags and build all come later, and
 | `:Aegis scan <plugin>` | scan one |
 | `:Aegis report <plugin>` | risk flags and `file:line` evidence |
 | `:Aegis approve <plugin>` | allow the installed commit, and only that commit |
+| `:Aegis approve! <plugin>` | allow the commit a pending update wants to move to |
 | `:Aegis revoke <plugin>` | drop an approval |
 | `:Aegis clear` | clear the verdict cache, keep approvals |
 | `:checkhealth aegis` | confirm the gates and hardening are actually wired |
 
 Approvals are pinned to a commit sha. The next update moves the sha, the
 approval stops applying, and the new tree is gated again.
+
+Bare `:Aegis approve` only ever blesses the commit that is already installed, so
+answering a blocked update reflexively can never wave the incoming commit
+through. When you have looked at an update and do want it, `:Aegis approve!`
+(after the `:Lazy update` that blocked, in the same session) approves the target
+the update is moving to; the next `:Lazy update` completes it.
 
 ## What this does not protect you from
 
