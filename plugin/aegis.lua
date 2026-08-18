@@ -20,14 +20,24 @@ vim.api.nvim_create_user_command("Aegis", function(cmd)
   local action = cmd.fargs[1] or "status"
   local name = cmd.fargs[2]
 
+  -- `:Aegis approve! <plugin>` reads more naturally than `:Aegis! approve`, but
+  -- Vim only treats the bang as a command bang in the latter. Accept a trailing
+  -- `!` on the subcommand token too, so both spellings set the bang.
+  local bang = cmd.bang
+  if action:sub(-1) == "!" then
+    action = action:sub(1, -2)
+    bang = true
+  end
+
   if action == "status" then
     require("aegis.ui").status()
   elseif action == "report" then
     if not name then return vim.notify("aegis: :Aegis report <plugin>", vim.log.levels.ERROR) end
     require("aegis.ui").report(name)
   elseif action == "approve" then
-    if not name then return vim.notify("aegis: :Aegis approve <plugin>", vim.log.levels.ERROR) end
-    local ok, msg = Aegis.approve(name)
+    if not name then return vim.notify("aegis: :Aegis approve[!] <plugin>", vim.log.levels.ERROR) end
+    -- bang = approve the pending update target, not just the installed commit.
+    local ok, msg = Aegis.approve(name, { target = bang })
     vim.notify("aegis: " .. msg, ok and vim.log.levels.INFO or vim.log.levels.ERROR)
   elseif action == "revoke" then
     if not name then return vim.notify("aegis: :Aegis revoke <plugin>", vim.log.levels.ERROR) end
@@ -38,7 +48,7 @@ vim.api.nvim_create_user_command("Aegis", function(cmd)
     vim.notify("aegis: verdict cache cleared (approvals kept)")
   elseif action == "scan" then
     if name then
-      local decision, err = Aegis.scan(name, { force = cmd.bang })
+      local decision, err = Aegis.scan(name, { force = bang })
       if not decision then return vim.notify("aegis: " .. tostring(err), vim.log.levels.ERROR) end
       vim.notify(
         require("aegis.util").summary(name, decision),
@@ -47,7 +57,7 @@ vim.api.nvim_create_user_command("Aegis", function(cmd)
     else
       vim.notify("aegis: scanning all plugins…")
       vim.schedule(function()
-        local results = Aegis.scan_all({ force = cmd.bang })
+        local results = Aegis.scan_all({ force = bang })
         local blocked = {}
         for pname, decision in pairs(results) do
           if not decision.allow then table.insert(blocked, pname) end

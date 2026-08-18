@@ -117,22 +117,49 @@ function M.scan_all(opts)
   return results
 end
 
---- Approve the tree currently installed at `name`. The approval is pinned to
---- that commit and dies the moment the plugin updates.
-function M.approve(name)
+--- Approve a tree at `name`. The approval is pinned to one commit and dies the
+--- moment the plugin moves off it.
+---
+--- By default this blesses the *installed* commit, and only that — so a refused
+--- update, which leaves the worktree on the old commit, cannot silently approve
+--- the incoming one. Pass `{ target = true }` (`:Aegis approve!`) to instead
+--- approve the commit an update wants to move to: the explicit, human-in-the-loop
+--- yes to a new commit you have looked at.
+---@param name string
+---@param opts? { target?: boolean }
+function M.approve(name, opts)
+  opts = opts or {}
   local plugin = lazy_plugins()[name]
   if not plugin then return false, ("unknown plugin %q"):format(name) end
 
-  -- A refused install is deleted, so there is usually nothing on disk to read
-  -- a sha from — and that is precisely when the user wants to approve. Fall
-  -- back to the commit the gate refused, then to the last one we scanned.
-  local report
-  local sha = Git.head_sha(plugin.dir)
-  if sha then
+  local report, sha
+
+  if opts.target then
+    -- The commit the pending update resolves to — the same one the update gate
+    -- scans and blocks. Prefer lazy's live resolution; fall back to whatever the
+    -- gate recorded as blocked this session.
+    sha = Gate.target_sha(plugin) or (Gate.blocked[name] and Gate.blocked[name].sha)
+    if not sha then
+      return false, ("no pending update target for %s — run `:Lazy update %s` first")
+        :format(name, name)
+    end
+    if sha == Git.head_sha(plugin.dir) then
+      return false, ("%s is already at %s; nothing to approve"):format(name, Git.short(sha))
+    end
     report = Cache.get(name, sha)
+      or (Gate.blocked[name] and Gate.blocked[name].report)
+      or Scan.scan_target(name, plugin.dir, sha)
   else
-    report = (Gate.blocked[name] and Gate.blocked[name].report) or Cache.latest(name)
-    sha = (Gate.blocked[name] and Gate.blocked[name].sha) or (report and report.sha)
+    -- A refused install is deleted, so there is usually nothing on disk to read
+    -- a sha from — and that is precisely when the user wants to approve. Fall
+    -- back to the commit the gate refused, then to the last one we scanned.
+    sha = Git.head_sha(plugin.dir)
+    if sha then
+      report = Cache.get(name, sha)
+    else
+      report = (Gate.blocked[name] and Gate.blocked[name].report) or Cache.latest(name)
+      sha = (Gate.blocked[name] and Gate.blocked[name].sha) or (report and report.sha)
+    end
   end
 
   if not sha then
@@ -141,8 +168,9 @@ function M.approve(name)
 
   Cache.approve(name, sha, report)
   Gate.blocked[name] = nil
+  local verb = opts.target and "update" or "install"
   return true,
-    ("approved %s at %s — run `:Lazy install` to complete it"):format(name, Git.short(sha))
+    ("approved %s at %s — run `:Lazy %s` to complete it"):format(name, Git.short(sha), verb)
 end
 
 function M.revoke(name)
