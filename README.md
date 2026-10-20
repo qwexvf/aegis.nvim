@@ -4,9 +4,8 @@ Supply-chain gate for [lazy.nvim](https://github.com/folke/lazy.nvim), backed by
 [aegis-cli](https://github.com/qwexvf/aegis-cli).
 
 Every point where a plugin repository can get its own code executed is gated on
-an aegis verdict for that exact commit. A plugin that fails the policy is not
-warned about after the fact — it does not get cloned, checked out, built, or
-added to `runtimepath`.
+an aegis verdict for that exact commit. A plugin that fails the policy doesn't get a warning after the fact. It never
+gets cloned, checked out, built, or added to `runtimepath`.
 
 ```
 :Lazy install                        :Lazy update
@@ -29,7 +28,7 @@ gate or is switched off outright:
 
 | Execution path | When | Handled by |
 |---|---|---|
-| `plugin.build` — shell strings, `build.lua`, `:cmd` | after install/update | build gate |
+| `plugin.build` (shell strings, `build.lua`, `:cmd`) | after install/update | build gate |
 | `plugin/`, `ftdetect/`, `after/plugin/` auto-sourcing | when lazy adds the dir to `runtimepath` | load gate (`defaults.cond`) |
 | lazy reading the repo's own `lazy.lua` / rockspec / packspec to build a spec | during spec resolve, **before install** | `pkg.enabled = false` |
 | luarocks build scripts | install | `rocks.enabled = false` |
@@ -42,7 +41,7 @@ earlier than any scan could see it, so there is nowhere to put a check.
 
 - Neovim 0.10+
 - lazy.nvim
-- `aegis` on `PATH` — `aegis analyze --ecosystem neovim` must work
+- `aegis` on `PATH` (`aegis analyze --ecosystem neovim` must work)
 
 ## Install
 
@@ -71,9 +70,9 @@ require("lazy").setup(spec, require("aegis").lazy_opts({
 }))
 ```
 
-`lazy_opts()` is what wires everything in. Passing your options through it is
-not optional — without it the hardening and the load gate are absent, and
-`:checkhealth aegis` will say so.
+`lazy_opts()` is what wires everything in. You have to pass your options through
+it. Without it there is no hardening and no load gate, and `:checkhealth aegis`
+will tell you.
 
 To let `:Lazy update` keep aegis.nvim itself current, add a matching spec that
 points at the bootstrap clone:
@@ -126,7 +125,7 @@ aegis scores a Lua tree from the capabilities it finds: `shell-spawn` 20,
 tiers are review ≥21, prompt ≥61, block ≥100.
 
 A plugin that shells out, evals a downloaded payload, reads credentials from
-the environment and talks to a hardcoded IP scores **75** — `prompt`, not
+the environment and talks to a hardcoded IP scores **75**: `prompt`, not
 `block`. For a Lua-only plugin the block tier is realistically only reached via
 a malicious build hook (`install-hook-suspicious`, weight 70). Gating on
 `block` would therefore let the interesting cases through, so the default is
@@ -144,7 +143,7 @@ that yes.
 | gitsigns.nvim | prompt | 75 | **needs approval** |
 | LuaSnip | prompt | 80 | **needs approval** |
 
-Nothing is wrong with gitsigns or LuaSnip — they genuinely eval, read the
+Nothing is wrong with gitsigns or LuaSnip. They really do eval, read the
 environment and ship native artifacts, and the scanner is right to say so. The
 point of the default is that you look once, `:Aegis approve`, and then find out
 if that ever changes.
@@ -165,7 +164,7 @@ Off by default. When on, a new plugin is cloned into a throwaway directory and
 scanned there, so a rejected tree never occupies `plugin.dir` at all. Costs one
 extra shallow fetch per new plugin.
 
-With it off, the tree does land in `plugin.dir` before the scan — but nothing
+With it off, the tree does land in `plugin.dir` before the scan. But nothing
 has executed at that point (checkout, helptags and build all come later, and
 `runtimepath` is untouched), and a rejected clone is deleted.
 
@@ -216,7 +215,7 @@ tests/run.sh 03       # one
 ```
 
 Real nvim, real lazy.nvim, real aegis, real git repos over `file://`. Nothing
-is mocked — each test asserts the malicious fixture is actually stopped:
+is mocked. Each test checks that the malicious fixture is actually stopped:
 
 | Suite | Asserts |
 |---|---|
@@ -232,7 +231,7 @@ lazy.nvim is fetched into a cache dir on first run; point `AEGIS_TEST_LAZY` at
 an existing checkout to skip that.
 
 CI runs stylua and luacheck on every push. The e2e suite needs the `aegis`
-binary, which currently lives in a private repo — public runners cannot fetch
+binary, which currently lives in a private repo. Public runners can't fetch
 it, so that job emits a "skipped" warning rather than failing. **Run
 `tests/run.sh` locally before trusting a green CI badge on this repo.**
 
