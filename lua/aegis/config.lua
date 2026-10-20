@@ -19,10 +19,11 @@ M.defaults = {
   --
   -- "prompt" rather than "block" on purpose. aegis scores a Lua tree from its
   -- capabilities, and the block tier (>=100) is realistically only reached by
-  -- a malicious build hook. A plugin that shells out, evals a downloaded
-  -- payload, reads credentials from the environment and talks to a raw IP
-  -- scores 75 — "prompt", aegis's own word for "a human has to say yes".
-  -- `:Aegis approve` is that yes, pinned to the exact commit.
+  -- a malicious build hook. "prompt" (>=61) is aegis's own word for "a human
+  -- has to say yes", and `:Aegis approve` is that yes, pinned to the exact
+  -- commit. "review" would catch most popular plugins: on aegis 0.32 gitsigns
+  -- scores 58 and lazy.nvim 53. LuaSnip (70) prompts because it loads its own
+  -- native jsregexp build.
   fail_on = "prompt",
 
   -- Gates. Each can be disabled independently while you tune the policy.

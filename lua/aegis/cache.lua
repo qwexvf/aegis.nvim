@@ -40,12 +40,26 @@ local function verdict_path(name, sha)
   return vim.fs.joinpath(verdict_dir(), ("%s@%s.json"):format(slug(name), Git.short(sha)))
 end
 
+--- Map the Rust CLI's field names onto the ones the rest of the plugin reads.
+--- Lives here because every report passes through either a fresh scan or
+--- this cache, and reports written by the Go CLI already use the old names.
+---@param report table
+---@return table
+function M.normalize(report)
+  report.risk_score = report.risk_score or report.score
+  report.risk_flags = report.risk_flags or report.flags
+  return report
+end
+
 --- Cached verdict for an exact (name, sha), or nil.
 ---@return table?
 function M.get(name, sha)
   if not sha then return nil end
   local data = read_json(verdict_path(name, sha))
-  if data then data.cached = true end
+  if data then
+    data.cached = true
+    M.normalize(data)
+  end
   return data
 end
 
@@ -70,6 +84,7 @@ function M.list()
       local path = vim.fs.joinpath(verdict_dir(), entry)
       local data = read_json(path)
       if data then
+        M.normalize(data)
         local st = vim.uv.fs_stat(path)
         data.scanned_at = st and st.mtime.sec or 0
         table.insert(out, data)

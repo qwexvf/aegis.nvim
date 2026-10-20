@@ -4,7 +4,8 @@
 --
 -- Lua AST capability scan over a plugin tree. Returns aegis's report table:
 --   { name, version, verdict, risk_score, capabilities[], risk_flags[], evidence[] }
--- verdict is one of safe|review|prompt|block.
+-- verdict is one of safe|review|prompt|block. The Rust CLI calls the score and
+-- flags `score` and `flags`; Cache.normalize() maps them onto these names.
 local Cache = require("aegis.cache")
 local Config = require("aegis.config")
 local Git = require("aegis.git")
@@ -24,7 +25,11 @@ function M.version()
     version_cache = false
     return nil
   end
-  local res = Proc.exec({ bin, "version" }, { timeout = 10000 })
+  -- The Rust CLI only knows `--version`; the old Go CLI only knew `version`.
+  -- Probing the wrong one made available() false, and with on_missing_scanner
+  -- = "warn" every gate then let plugins through unscanned.
+  local res = Proc.exec({ bin, "--version" }, { timeout = 10000 })
+  if res.code ~= 0 then res = Proc.exec({ bin, "version" }, { timeout = 10000 }) end
   local raw = res.code == 0 and res.stdout or ""
   version_cache = raw:match("%d[%w%.%-]*") or (res.code == 0 and "unknown") or false
   return version_cache or nil
@@ -96,7 +101,7 @@ function M.scan_dir(dir)
       ("aegis analyze failed (exit %d)%s"):format(res.code, detail ~= "" and ": " .. detail or "")
   end
   if not report.verdict then return nil, "aegis returned a report with no verdict" end
-  return report
+  return Cache.normalize(report)
 end
 
 --- Verdict for the tree currently checked out at plugin.dir, cache-first.

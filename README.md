@@ -120,32 +120,43 @@ require("aegis").setup({
 
 ### `fail_on` defaults to `prompt`, not `block`
 
-aegis scores a Lua tree from the capabilities it finds: `shell-spawn` 20,
-`dynamic-eval` 25, `fs-write-outside-root` 15, `raw-ip-literal` 15. Verdict
-tiers are review ≥21, prompt ≥61, block ≥100.
+aegis scores a Lua tree from the capabilities it finds. As of aegis 0.32:
+`shell-spawn` 10, `dynamic-eval` 15, `fs-write-outside-root` 8,
+`raw-ip-literal` 10, a credential-looking environment read 15, loading native
+code (`ffi.load`, `package.cpath`, `package.loadlib`) 20. Verdict tiers are
+review ≥21, prompt ≥61, block ≥100. aegis.nvim needs 0.32 or later; on 0.30
+and 0.31 Lua credential reads and native loading score nothing, and the test
+suite's malicious fixture slips through at `review`.
 
-A plugin that shells out, evals a downloaded payload, reads credentials from
-the environment and talks to a hardcoded IP scores **75**: `prompt`, not
-`block`. For a Lua-only plugin the block tier is realistically only reached via
-a malicious build hook (`install-hook-suspicious`, weight 70). Gating on
-`block` would therefore let the interesting cases through, so the default is
-`prompt`: aegis's own word for "a human has to say yes". `:Aegis approve` is
-that yes.
+For a Lua-only plugin the block tier is realistically only reached via a
+malicious build hook (`install-hook-suspicious`, weight 70). Gating on `block`
+would therefore let the interesting cases through, so the default is `prompt`:
+aegis's own word for "a human has to say yes". `:Aegis approve` is that yes.
 
-**Expect real plugins to trip this.** Measured against current upstream HEAD:
+The test suite's malicious fixture shells out, evals a downloaded payload,
+reads `GITHUB_TOKEN`, writes outside its directory, talks to a raw IP and loads
+a native library. It scores **78**: `prompt`, blocked by the default.
+
+Measured with aegis 0.32.0:
 
 | Plugin | Verdict | Risk | Under the default |
 |---|---|---|---|
-| plenary.nvim | review | 40 | allowed |
-| mason.nvim | review | 40 | allowed |
-| telescope.nvim | review | 45 | allowed |
-| which-key.nvim | review | 60 | allowed |
-| gitsigns.nvim | prompt | 75 | **needs approval** |
-| LuaSnip | prompt | 80 | **needs approval** |
+| nvim-cmp | safe | 0 | allowed |
+| nvim-lspconfig | safe | 18 | allowed |
+| mason.nvim | review | 23 | allowed |
+| telescope.nvim | review | 25 | allowed |
+| conform.nvim | review | 26 | allowed |
+| plenary.nvim | review | 33 | allowed |
+| which-key.nvim | review | 33 | allowed |
+| lualine.nvim | review | 41 | allowed |
+| nvim-treesitter | review | 41 | allowed |
+| lazy.nvim | review | 53 | allowed |
+| gitsigns.nvim | review | 58 | allowed |
+| LuaSnip | prompt | 70 | approve once |
 
 Nothing is wrong with gitsigns or LuaSnip. They really do eval, read the
 environment and ship native artifacts, and the scanner is right to say so. The
-point of the default is that you look once, `:Aegis approve`, and then find out
+point of approving is that you look once, `:Aegis approve`, and then find out
 if that ever changes.
 
 If that trade is not the one you want, `fail_on = "block"` reduces this to
@@ -230,10 +241,11 @@ is mocked. Each test checks that the malicious fixture is actually stopped:
 lazy.nvim is fetched into a cache dir on first run; point `AEGIS_TEST_LAZY` at
 an existing checkout to skip that.
 
-CI runs stylua and luacheck on every push. The e2e suite needs the `aegis`
-binary, and CI does not install it yet, so that job emits a "skipped" warning
-rather than failing. **Run `tests/run.sh` locally before trusting a green CI
-badge on this repo.**
+CI runs stylua, luacheck, and the e2e suite on Neovim stable and nightly. The
+e2e job downloads a pinned aegis-cli release (`AEGIS_VERSION` in
+`.github/workflows/ci.yml`) and checks it against the release's
+`checksums.txt`, so a scoring change in aegis only reaches this repo through a
+deliberate version bump.
 
 ## License
 
