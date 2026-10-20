@@ -23,7 +23,7 @@ startup                      │                                        │
 
 ## Why the gates sit where they do
 
-Cloning a repository does not execute anything. Four things do, and each has a
+Cloning a repository does not execute anything. Five things do, and each has a
 gate or is switched off outright:
 
 | Execution path | When | Handled by |
@@ -231,9 +231,9 @@ lazy.nvim is fetched into a cache dir on first run; point `AEGIS_TEST_LAZY` at
 an existing checkout to skip that.
 
 CI runs stylua and luacheck on every push. The e2e suite needs the `aegis`
-binary, which currently lives in a private repo. Public runners can't fetch
-it, so that job emits a "skipped" warning rather than failing. **Run
-`tests/run.sh` locally before trusting a green CI badge on this repo.**
+binary, and CI does not install it yet, so that job emits a "skipped" warning
+rather than failing. **Run `tests/run.sh` locally before trusting a green CI
+badge on this repo.**
 
 ## License
 
