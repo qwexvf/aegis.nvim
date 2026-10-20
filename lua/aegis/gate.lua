@@ -325,6 +325,7 @@ function M.drain_pending()
       vim.schedule(function()
         local report = Proc.decode_json(res.stdout)
         if report and report.verdict then
+          Cache.normalize(report)
           local sha = Git.head_sha(dir)
           report.sha = sha
           Cache.put(name, sha, report)
