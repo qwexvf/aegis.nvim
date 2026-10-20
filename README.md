@@ -120,35 +120,39 @@ require("aegis").setup({
 
 ### `fail_on` defaults to `prompt`, not `block`
 
-aegis scores a Lua tree from the capabilities it finds. As of aegis 0.31:
+aegis scores a Lua tree from the capabilities it finds. As of aegis 0.32:
 `shell-spawn` 10, `dynamic-eval` 15, `fs-write-outside-root` 8,
-`raw-ip-literal` 10, a credential-looking environment read 15. Verdict tiers
-are review ≥21, prompt ≥61, block ≥100.
+`raw-ip-literal` 10, a credential-looking environment read 15, loading native
+code (`ffi.load`, `package.cpath`, `package.loadlib`) 20. Verdict tiers are
+review ≥21, prompt ≥61, block ≥100. aegis.nvim needs 0.32 or later; on 0.30
+and 0.31 Lua credential reads and native loading score nothing, and the test
+suite's malicious fixture slips through at `review`.
 
 For a Lua-only plugin the block tier is realistically only reached via a
 malicious build hook (`install-hook-suspicious`, weight 70). Gating on `block`
 would therefore let the interesting cases through, so the default is `prompt`:
 aegis's own word for "a human has to say yes". `:Aegis approve` is that yes.
 
-**Known gap on aegis 0.31.** aegis lowered these weights in 0.30 to cut false
-positives on npm and PyPI, and its Lua rules don't yet score credential reads
-(`os.getenv("AWS_SECRET_ACCESS_KEY")`) or native loading (`ffi.load`,
-`package.cpath`). So the test suite's malicious fixture, which shells out,
-evals a downloaded payload, reads credentials and talks to a raw IP, scores
-only **43**: `review`, which the default lets through. The e2e suite fails
-until that is fixed in aegis-cli. Until then, `fail_on = "review"` blocks it, at
-the cost of approving most popular plugins once (table below).
+The test suite's malicious fixture shells out, evals a downloaded payload,
+reads `GITHUB_TOKEN`, writes outside its directory, talks to a raw IP and loads
+a native library. It scores **78**: `prompt`, blocked by the default.
 
-Measured with aegis 0.31.0:
+Measured with aegis 0.32.0:
 
 | Plugin | Verdict | Risk | Under the default |
 |---|---|---|---|
+| nvim-cmp | safe | 0 | allowed |
+| nvim-lspconfig | safe | 18 | allowed |
 | mason.nvim | review | 23 | allowed |
 | telescope.nvim | review | 25 | allowed |
+| conform.nvim | review | 26 | allowed |
 | plenary.nvim | review | 33 | allowed |
 | which-key.nvim | review | 33 | allowed |
-| LuaSnip | review | 50 | allowed |
+| lualine.nvim | review | 41 | allowed |
+| nvim-treesitter | review | 41 | allowed |
+| lazy.nvim | review | 53 | allowed |
 | gitsigns.nvim | review | 58 | allowed |
+| LuaSnip | prompt | 70 | approve once |
 
 Nothing is wrong with gitsigns or LuaSnip. They really do eval, read the
 environment and ship native artifacts, and the scanner is right to say so. The

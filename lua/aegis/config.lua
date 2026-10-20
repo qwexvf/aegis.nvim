@@ -21,8 +21,9 @@ M.defaults = {
   -- capabilities, and the block tier (>=100) is realistically only reached by
   -- a malicious build hook. "prompt" (>=61) is aegis's own word for "a human
   -- has to say yes", and `:Aegis approve` is that yes, pinned to the exact
-  -- commit. "review" would catch most popular plugins: on aegis 0.31 gitsigns
-  -- scores 58 and LuaSnip 50.
+  -- commit. "review" would catch most popular plugins: on aegis 0.32 gitsigns
+  -- scores 58 and lazy.nvim 53. LuaSnip (70) prompts because it loads its own
+  -- native jsregexp build.
   fail_on = "prompt",
 
   -- Gates. Each can be disabled independently while you tune the policy.
